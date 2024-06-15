@@ -2,10 +2,16 @@ package com.example.layeredarchitecture.dao;
 
 import com.example.layeredarchitecture.db.DBConnection;
 import com.example.layeredarchitecture.model.OrderDTO;
+import com.example.layeredarchitecture.model.OrderDetailDTO;
 
 import java.sql.*;
+import java.util.List;
 
 public class OrderDAOImpl  implements  OrderDAO{
+    private Connection connection = DBConnection.getDbConnection().getConnection();
+    OrderDetailsDAO orderDetailsDAO = new OrderDetailsDAOImpl();
+    public OrderDAOImpl() throws SQLException, ClassNotFoundException {
+    }
 @Override
     public String lastOrderId() throws SQLException, ClassNotFoundException {
 
@@ -25,16 +31,32 @@ public class OrderDAOImpl  implements  OrderDAO{
         stm.setString(1, orderId);
         return stm.executeQuery().next();
     }
-    @Override
-    public int addOrder(OrderDTO orderDTO) throws SQLException, ClassNotFoundException {
-        Connection connection = DBConnection.getDbConnection().getConnection();
 
-      PreparedStatement  stm = connection.prepareStatement("INSERT INTO `Orders` (oid, date, customerID) VALUES (?,?,?)");
+    public boolean saveOrder(OrderDTO orderDTO, List<OrderDetailDTO> orderDetails) throws SQLException, ClassNotFoundException {
+        connection.setAutoCommit(false);
+        PreparedStatement stm = connection.prepareStatement("INSERT INTO `Orders` (oid, date, customerID) VALUES (?,?,?)");
         stm.setString(1, orderDTO.getOrderId());
         stm.setDate(2, Date.valueOf(orderDTO.getOrderDate()));
         stm.setString(3, orderDTO.getCustomerId());
 
-      return  stm.executeUpdate();
+
+        if (stm.executeUpdate() == 1) {
+
+            if (orderDetailsDAO.addOrderDetails(orderDTO.getOrderId(),orderDetails)) {
+
+                connection.commit();
+                connection.setAutoCommit(true);
+                return true;
+
+            }
+
+            connection.rollback();
+            connection.setAutoCommit(true);
+
+
+        }connection.rollback();
+        connection.setAutoCommit(true);
+        return false;
     }
 
 }
